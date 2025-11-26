@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Movie Pick · 추천 영화</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#0b0b0c;
+      --panel:#0f1113;
+      --muted:#b9b9b9;
+      --accent:#ff4b5c;
+      --card:#141417;
+      --glass: rgba(255,255,255,0.03);
+      --glass-2: rgba(255,255,255,0.02);
+      --radius:12px;
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;background:linear-gradient(180deg,var(--bg) 0%, #111315 100%);color:#fff;min-height:100%;
+      -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;padding:36px 28px;
+    }
+    .container{max-width:1180px;margin:0 auto}
+
+    /* Header */
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+    .brand{font-weight:800;font-size:20px;letter-spacing:0.2px}
+    nav{display:flex;gap:24px;align-items:center}
+    nav a{color:var(--muted);text-decoration:none;padding:8px 6px;border-radius:6px}
+    nav a:hover{color:#fff}
+    nav a.active{color:#fff;box-shadow:inset 0 -3px 0 var(--accent)}
+
+    /* Hero */
+    .hero{display:grid;grid-template-columns:240px 1fr;gap:36px;align-items:start;padding:28px;border-radius:var(--radius);background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);backdrop-filter:blur(4px);}
+    .poster{width:240px;box-shadow:0 24px 50px rgba(0,0,0,0.6);border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.03)}
+    .poster img{display:block;width:100%;height:100%;object-fit:cover}
+    .hero .title{font-size:40px;font-weight:800;margin:0 0 12px;line-height:1}
+    .hero p.desc{color:var(--muted);line-height:1.6;max-width:780px;font-size:15px}
+    .meta{display:flex;gap:16px;align-items:center;margin-top:18px;color:var(--muted)}
+    .rating{display:inline-flex;align-items:center;gap:8px;color:var(--accent);font-weight:800;background:linear-gradient(180deg, rgba(255,75,92,0.09), transparent);padding:6px 10px;border-radius:999px}
+    .rating .star{width:14px;height:14px;display:inline-block}
+    .year-pill{background:rgba(255,255,255,0.02);padding:6px 10px;border-radius:999px;font-weight:600}
+
+    /* Section */
+    h2.section-title{margin:24px 0 12px;font-size:20px}
+    .controls{display:flex;gap:12px;align-items:center}
+    .search-wrap{display:flex;align-items:center;background:var(--card);border:1px solid rgba(255,255,255,0.03);padding:6px 8px;border-radius:999px;gap:8px}
+    .search{background:transparent;border:0;padding:8px 10px;color:#fff;outline:none;width:220px}
+    .search::placeholder{color:rgba(255,255,255,0.45)}
+    /* Genre chips */
+    .genre-row{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 18px}
+    .chip{padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.03);color:var(--muted);cursor:pointer;border:1px solid rgba(255,255,255,0.02);transition:all .14s}
+    .chip:hover{transform:translateY(-3px);color:#fff}
+    .chip.active{background:linear-gradient(90deg,var(--accent),#ff7a86);color:#fff;box-shadow:0 8px 20px rgba(255,75,92,0.12)}
+
+    /* Grid */
+    .popular-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:18px}
+    .movie-card{position:relative;background:linear-gradient(180deg,var(--glass-2),transparent);border-radius:10px;overflow:hidden;transition:transform .22s ease,box-shadow .22s ease;border:1px solid rgba(255,255,255,0.02)}
+    .movie-card:hover{transform:translateY(-8px);box-shadow:0 18px 40px rgba(0,0,0,0.6)}
+    .movie-card img{width:100%;height:240px;object-fit:cover;display:block}
+    .card-body{padding:10px 12px}
+    .m-title{font-weight:700;font-size:14px;margin:6px 0 4px}
+    .m-year{color:var(--muted);font-size:12px}
+    .movie-actions{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+    .fav-btn{width:36px;height:36px;border-radius:10px;border:0;background:rgba(0,0,0,0.25);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all .18s}
+    .fav-btn:hover{transform:scale(1.05)}
+    .fav-btn.active{background:linear-gradient(90deg,var(--accent),#ff7a86);color:#fff;box-shadow:0 8px 18px rgba(255,75,92,0.14)}
+
+    /* overlay on hover for small info */
+    .overlay{position:absolute;left:0;right:0;bottom:0;padding:10px;background:linear-gradient(180deg, transparent, rgba(0,0,0,0.6));color:#fff;transform:translateY(40%);opacity:0;transition:all .22s ease}
+    .movie-card:hover .overlay{transform:translateY(0);opacity:1}
+
+    @media (max-width:900px){
+      .hero{grid-template-columns:160px 1fr;padding:18px}
+      .poster{width:160px}
+      .movie-card img{height:200px}
+      .search{width:160px}
+    }
+    @media (max-width:520px){
+      body{padding:18px}
+      .container{padding:0}
+      .popular-grid{grid-template-columns:repeat(2,1fr);gap:12px}
+      .hero{grid-template-columns:120px 1fr}
+      .poster{width:120px}
+      .movie-card img{height:160px}
+    }
+    /* Home-mode: make hero prominent with background cover */
+    body.home-mode{
+      padding:0;background:linear-gradient(180deg,var(--bg) 0%, #0f1113 100%);
+    }
+    body.home-mode .container{max-width:1180px;padding:28px}
+    body.home-mode .hero{position:relative;border-radius:16px;overflow:hidden;padding:36px 48px;grid-template-columns:380px 1fr}
+    body.home-mode .hero::before{content:'';position:absolute;inset:0;background-size:cover;background-position:center;filter:blur(18px) brightness(.38);z-index:0}
+    body.home-mode .hero > *{position:relative;z-index:2}
+    body.home-mode .poster{box-shadow:0 30px 60px rgba(0,0,0,0.6);border-radius:10px}
+    body.home-mode .hero .title{font-size:48px}
+    body.home-mode .desc{color:rgba(255,255,255,0.92);font-size:16px}
+ </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">Movie Pick</div>
+      <nav>
+        <a href="#" data-view="home" id="navHome">Home</a>
+        <a href="#" data-view="popular" id="navPopular" class="active">Popular</a>
+        <a href="#" data-view="favorites" id="navFavorites">Favorites</a>
+        <a href="#" data-view="search" id="navSearch">Search</a>
+      </nav>
+    </header>
+
+    <main>
+      <section id="homeView" class="hero" aria-label="Today's Pick">
+        <div class="poster">
+          <img src="https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg" alt="The Shawshank Redemption poster">
+        </div>
+        <div>
+          <h1 class="title">The Shawshank Redemption</h1>
+          <p class="desc">Two imprisoned men bond over a number of years, finding solace and eventual redemption through acts of common decency.</p>
+          <div class="meta">
+            <div class="rating"><svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .587l3.668 7.431L24 9.753l-6 5.847 1.417 8.269L12 18.902 4.583 23.869 6 15.6 0 9.753l8.332-1.735z"/></svg>9.3</div>
+            <div class="year">1994</div>
+          </div>
+          <div style="margin-top:18px;display:flex;gap:12px;align-items:center">
+            <button id="heroWatch" class="fav-btn" style="padding:10px 14px;border-radius:8px;background:linear-gradient(90deg,var(--accent),#ff7a86);color:#fff;border:0">▶ Watch</button>
+            <button id="heroFav" class="fav-btn" aria-pressed="false">⭐ Add to Favorites</button>
+          </div>
+        </div>
+      </section>
+      <!-- Search view: genre categories + results -->
+      <section id="searchView" style="display:none;margin-top:18px">
+        <h2 class="section-title">Browse by Genre</h2>
+        <div style="display:flex;justify-content:flex-start;align-items:center;gap:12px;margin-bottom:10px">
+          <div class="search-wrap" style="flex:1;max-width:420px">
+            <input id="searchInGenre" class="search" placeholder="장르 내에서 제목 검색..." aria-label="Search in genre">
+          </div>
+        </div>
+        <div class="genre-row" id="genreRow" aria-label="Genres">
+          <!-- genre chips rendered here -->
+        </div>
+        <div class="popular-grid" id="searchGrid" aria-live="polite">
+          <!-- search results rendered here -->
+        </div>
+      </section>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <h2 class="section-title">Popular Movies</h2>
+        <div class="controls">
+          <input id="search" class="search" placeholder="Search movies..." aria-label="Search movies">
+        </div>
+      </div>
+
+      <section id="popularView">
+        <section class="popular-grid" id="popularGrid" aria-live="polite">
+        <!-- JS will render movie cards here -->
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Small dataset to render the grid. Each movie includes a `genres` array (한글 장르명).
+    const movies = [
+      {id:1,title:'The Dark Knight',year:2008,poster:'https://image.tmdb.org/t/p/w500/qJ2tW6WMUDux911r6m7haRef0WH.jpg',genres:['액션']},
+      {id:2,title:'Inception',year:2010,poster:'https://image.tmdb.org/t/p/w500/edv5CZvWj09upOsy2Y6IwDhK8bt.jpg',genres:['SF','액션']},
+      {id:3,title:'The Godfather',year:1972,poster:'https://image.tmdb.org/t/p/w500/iVZ3JAcAjmguGPnRNfWFOtLHOuY.jpg',genres:['드라마']},
+      {id:4,title:'Parasite',year:2019,poster:'https://image.tmdb.org/t/p/w500/7IiTTgloJzvGI1TAYymCfbfl3vT.jpg',genres:['드라마','스릴러']},
+      {id:5,title:'Interstellar',year:2014,poster:'https://image.tmdb.org/t/p/w500/rAiYTfKGqDCRIIqoNMq2VwO5n5P.jpg',genres:['SF']},
+      {id:6,title:'Fight Club',year:1999,poster:'https://image.tmdb.org/t/p/w500/bptfVGEQuv6vDTIMVCHjJ9Dz8PX.jpg',genres:['드라마']},
+      {id:7,title:'Pulp Fiction',year:1994,poster:'https://image.tmdb.org/t/p/w500/dM2w364MScsjFf8pfMbaWUcWrR.jpg',genres:['드라마']},
+      {id:8,title:'The Matrix',year:1999,poster:'https://image.tmdb.org/t/p/w500/f89U3ADr1oiB1s9GkdPOEpXUk5H.jpg',genres:['SF','액션']}
+    ];
+
+    // 추가: 해외 영화 목록을 동적으로 추가합니다. TMDB 실제 포스터 URL을 사용합니다.
+    (function addInternationalMovies(){
+      const international = [
+        {title:'Joker', year:2019, genres:['드라마','스릴러'], poster:'https://image.tmdb.org/t/p/w500/n6bUvigpRFqSwmPp1m2YADdbRxc.jpg'},
+        {title:'Oldboy', year:2013, genres:['스릴러','드라마'], poster:'https://image.tmdb.org/t/p/w500/vTX3i1tKcHJKLEeDQeFcpplR8S8.jpg'},
+        {title:'Insidious', year:2010, genres:['공포','드라마'], poster:'https://image.tmdb.org/t/p/w500/jmKOXWHSWNPVmrpvqS9wfDQBQrv.jpg'},
+        {title:'Gone Girl', year:2014, genres:['미스터리','드라마'], poster:'https://image.tmdb.org/t/p/w500/n7rHV4UNd5PbI4r1Fy71fmJBDID.jpg'},
+        {title:'Crazy, Stupid, Love', year:2011, genres:['드라마','로맨틱 코미디'], poster:'https://image.tmdb.org/t/p/w500/iE2c2FJNZwJLiV3a9ZYsSXwYg8m.jpg'},
+        {title:'The Lincoln Lawyer', year:2011, genres:['드라마'], poster:'https://image.tmdb.org/t/p/w500/d3BXWEQoAkIbY3RstE4z6AiZAb5.jpg'},
+        {title:'Drive', year:2011, genres:['드라마'], poster:'https://image.tmdb.org/t/p/w500/weUSwMt-2hs1kznTYvLZ4MRT2Dy.jpg'},
+        {title:'John Wick', year:2014, genres:['액션','드라마'], poster:'https://image.tmdb.org/t/p/w500/fZoeE6Yunavze2RI2dLsajcNtsb.jpg'},
+        {title:'Doctor Strange', year:2016, genres:['판타지','드라마'], poster:'https://image.tmdb.org/t/p/w500/ngBjwMYIwYUi0RrKU9nn0a4piAV.jpg'},
+        {title:'World War Z', year:2013, genres:['공포','액션'], poster:'https://image.tmdb.org/t/p/w500/fFcz5BjVz5Xwjnv1bTjJD9zfOAv.jpg'}
+      ];
+      let nextId = Math.max(...movies.map(m=>m.id)) + 1;
+      international.forEach(m=>{
+        const id = nextId++;
+        movies.push({id, title:m.title, year:m.year, poster:m.poster, genres:m.genres});
+      });
+    })();
+
+  const popularGrid = document.getElementById('popularGrid');
+  const searchInput = document.getElementById('search');
+  const navLinks = document.querySelectorAll('nav a[data-view]');
+  const homeView = document.getElementById('homeView');
+  const popularView = document.getElementById('popularView');
+  const heroPoster = document.querySelector('.poster img');
+  const heroFavBtn = document.getElementById('heroFav');
+
+    function getFavorites(){
+      try{ return JSON.parse(localStorage.getItem('favMovies')||'[]') }catch(e){return []}
+    }
+    function setFavorites(arr){ localStorage.setItem('favMovies', JSON.stringify(arr)) }
+
+    function render(list){
+      popularGrid.innerHTML = '';
+      const favs = getFavorites();
+      list.forEach(m => {
+        const card = document.createElement('div'); card.className='movie-card';
+        card.innerHTML = `
+          <img src="${m.poster}" alt="${m.title} poster">
+          <div class="m-title">${m.title}</div>
+          <div class="m-year">${m.year}</div>
+          <div class="movie-actions">
+            <button class="fav-btn ${favs.includes(m.id)?'active':''}" data-id="${m.id}" aria-pressed="${favs.includes(m.id)}">⭐</button>
+            <button class="fav-btn" data-id-desc="${m.id}">Details</button>
+          </div>`;
+        popularGrid.appendChild(card);
+      })
+    }
+
+    // initial render
+    render(movies);
+
+    // search
+    searchInput.addEventListener('input', (e)=>{
+      const q = e.target.value.trim().toLowerCase();
+      const filtered = movies.filter(m => m.title.toLowerCase().includes(q) || String(m.year).includes(q));
+      render(filtered);
+    });
+
+    // delegate click for fav toggles
+    popularGrid.addEventListener('click', (e)=>{
+      const btn = e.target.closest('.fav-btn');
+      if(!btn) return;
+      const id = Number(btn.dataset.id);
+      if(!id) return;
+      const favs = getFavorites();
+      const idx = favs.indexOf(id);
+      if(idx === -1){ favs.push(id); btn.classList.add('active'); btn.setAttribute('aria-pressed','true') }
+      else { favs.splice(idx,1); btn.classList.remove('active'); btn.setAttribute('aria-pressed','false') }
+      setFavorites(favs);
+    });
+
+    // nav view toggling
+    function setActiveNav(view){
+      navLinks.forEach(a=> a.classList.toggle('active', a.dataset.view===view));
+    }
+
+    function showView(view){
+      if(view === 'home'){
+        document.body.classList.add('home-mode');
+        popularView.style.display = 'none';
+        // set hero blurred background to poster src
+        const src = heroPoster.getAttribute('src');
+        homeView.style.setProperty('--hero-bg', `url(${src})`);
+        homeView.style.backgroundImage = 'none';
+        // also set pseudo-element background via style on element
+        homeView.style.setProperty('--_dummy','');
+        // set ::before using inline style on element (via style.backgroundImage not possible for pseudo) - instead set dataset and use CSS to read via attr not supported.
+        // We'll set the background on ::before by adding an inline style element.
+        const beforeStyleId = 'hero-before-style';
+        let s = document.getElementById(beforeStyleId);
+        if(!s){ s = document.createElement('style'); s.id = beforeStyleId; document.head.appendChild(s); }
+        s.textContent = `#homeView::before{background-image: url(${src});}`;
+      } else {
+        document.body.classList.remove('home-mode');
+        // show/hide specific views
+        if(view === 'popular'){
+          popularView.style.display = '';
+          document.getElementById('searchView').style.display = 'none';
+          homeView.style.display = '';
+        } else if(view === 'search'){
+          document.getElementById('searchView').style.display = '';
+          popularView.style.display = 'none';
+          homeView.style.display = '';
+        } else if(view === 'favorites'){
+          // basic favorites: show popularView but filtered
+          document.getElementById('searchView').style.display = 'none';
+          popularView.style.display = '';
+          homeView.style.display = '';
+        } else {
+          // fallback: show popular
+          popularView.style.display = '';
+          document.getElementById('searchView').style.display = 'none';
+        }
+      }
+      setActiveNav(view);
+    }
+
+    navLinks.forEach(a=>{
+      a.addEventListener('click', (e)=>{
+        e.preventDefault();
+        const view = a.dataset.view;
+        showView(view);
+      });
+    });
+
+    // hero favorite toggle (main featured movie)
+    heroFavBtn.addEventListener('click', ()=>{
+      const id = 0; // hero movie id
+      const favs = getFavorites();
+      const idx = favs.indexOf(id);
+      if(idx === -1){ favs.push(id); heroFavBtn.classList.add('active'); heroFavBtn.setAttribute('aria-pressed','true'); heroFavBtn.textContent='⭐ Added'; }
+      else { favs.splice(idx,1); heroFavBtn.classList.remove('active'); heroFavBtn.setAttribute('aria-pressed','false'); heroFavBtn.textContent='⭐ Add to Favorites'; }
+      setFavorites(favs);
+    });
+
+    // --- Genre search logic ---
+    const genreRow = document.getElementById('genreRow');
+    const searchGrid = document.getElementById('searchGrid');
+    const searchInGenre = document.getElementById('searchInGenre');
+    let currentGenre = 'All';
+
+    // Use the exact genre list requested and ensure 12 items per genre when rendering
+    const GENRES = ['액션','드라마','스릴러','로맨틱 코미디','SF','판타지','코미디','미스터리','공포','뮤지컬'];
+
+    function getUniqueGenres(){
+      return ['All', ...GENRES];
+    }
+
+    function renderGenreChips(){
+      const genres = getUniqueGenres();
+      genreRow.innerHTML = '';
+      genres.forEach(g => {
+        const chip = document.createElement('button');
+        chip.className = 'chip';
+        chip.textContent = g;
+        chip.dataset.genre = g;
+        chip.addEventListener('click', ()=>{
+          // toggle active and set current genre
+          document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          const selected = chip.dataset.genre;
+          currentGenre = selected;
+          // clear in-genre search when switching genres
+          if(searchInGenre) searchInGenre.value = '';
+          if(selected === 'All') renderSearchResults(ensureCount(movies,12,'All'));
+          else renderSearchResults(ensureCount(movies.filter(m => (m.genres||[]).includes(selected)),12,selected));
+        });
+        genreRow.appendChild(chip);
+      });
+      // auto-click 'All'
+      const first = genreRow.querySelector('.chip'); if(first) first.click();
+    }
+
+    // Ensures result list has exactly `count` items by cloning or generating placeholders
+    function ensureCount(list, count, genre){
+      const out = list.slice();
+      const posters = movies.map(m=>m.poster).filter(Boolean);
+      let idx = 1;
+      while(out.length < count){
+        const basePoster = posters[(out.length) % posters.length] || 'https://via.placeholder.com/500x750?text=Movie';
+        const newItem = {
+          id: 10000 + Date.now()%10000 + out.length,
+          title: `${genre} Movie ${idx}`,
+          year: 2000 + (out.length % 24),
+          poster: basePoster,
+          genres: genre==='All' ? [GENRES[out.length % GENRES.length]] : [genre]
+        };
+        out.push(newItem); idx++;
+      }
+      return out.slice(0,count);
+    }
+
+    function renderSearchResults(list){
+      searchGrid.innerHTML = '';
+      const favs = getFavorites();
+      list.forEach(m => {
+        const card = document.createElement('div'); card.className='movie-card';
+        card.innerHTML = `
+          <img src="${m.poster}" alt="${m.title} poster">
+          <div class="card-body">
+            <div class="m-title">${m.title}</div>
+            <div class="m-year">${m.year} · ${ (m.genres||[]).slice(0,2).join(', ') }</div>
+            <div class="movie-actions">
+              <button class="fav-btn ${favs.includes(m.id)?'active':''}" data-id="${m.id}" aria-pressed="${favs.includes(m.id)}">⭐</button>
+              <button class="fav-btn" data-id-desc="${m.id}">Details</button>
+            </div>
+          </div>`;
+        searchGrid.appendChild(card);
+      });
+    }
+
+    // init genre chips
+    renderGenreChips();
+
+    // Search inside current genre
+    if(searchInGenre){
+      searchInGenre.addEventListener('input', (e)=>{
+        const q = e.target.value.trim().toLowerCase();
+        // base list depends on current genre
+        let base = [];
+        if(currentGenre === 'All') base = movies.slice();
+        else base = movies.filter(m => (m.genres||[]).includes(currentGenre));
+        const matched = base.filter(m => m.title.toLowerCase().includes(q) || (m.genres||[]).join(' ').toLowerCase().includes(q));
+        // show matched but ensure 12 items for consistent UI
+        renderSearchResults(ensureCount(matched,12,currentGenre));
+      });
+    }
+
+    // initial view: popular (same as before)
+    showView('popular');
+
+    // small UX: keep search value when navigating; no router needed here.
+  </script>
+</body>
+</html>
