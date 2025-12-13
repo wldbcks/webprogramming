@@ -1,0 +1,936 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>요리 레시피 모음</title>
+  <style>
+    :root{--bg:#0b0b0c;--card:#0f1720;--accent:#ff6b4a;--muted:#9aa4b2}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;background:linear-gradient(180deg,#071017 0%, #08121a 100%);color:#e6eef6}
+    header{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid rgba(255,255,255,0.04)}
+    header h1{margin:0;font-size:20px;letter-spacing:0.4px}
+    .controls{display:flex;gap:12px;align-items:center}
+    .search{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.03);padding:8px 12px;border-radius:999px;color:#e6eef6;min-width:220px}
+    main{padding:22px}
+    .intro{max-width:900px;margin:0 auto 18px;text-align:center}
+    .intro p{color:var(--muted);margin:6px 0 0}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:18px;max-width:1200px;margin:20px auto}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;overflow:hidden;box-shadow:0 6px 18px rgba(2,6,23,0.6);cursor:pointer;transition:transform .18s ease}
+    .card:hover{transform:translateY(-6px)}
+    .thumb{width:100%;height:140px;object-fit:cover;display:block}
+    .card-body{padding:12px}
+    .title{font-weight:600;margin:0 0 6px;font-size:16px}
+    .meta{color:var(--muted);font-size:13px}
+    .badge{display:inline-block;margin-top:8px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);font-size:12px;color:var(--muted)}
+
+    /* tabs */
+    .tabs{display:flex;gap:8px;margin:0 auto 20px;justify-content:center;max-width:1200px}
+    .tab-btn{padding:8px 16px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:var(--muted);border-radius:6px;cursor:pointer;transition:all 0.2s}
+    .tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+    /* modal */
+    .modal{position:fixed;inset:0;background:rgba(2,6,23,0.7);display:flex;align-items:center;justify-content:center;padding:28px;opacity:0;pointer-events:none;transition:opacity .18s}
+    .modal.open{opacity:1;pointer-events:auto}
+    .sheet{background:linear-gradient(180deg,#071421,#081826);width:100%;max-width:960px;border-radius:12px;padding:18px;color:#eaf4ff;box-shadow:0 20px 60px rgba(2,8,20,0.7);display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .sheet img{width:100%;height:100%;object-fit:cover;border-radius:10px}
+    .sheet .content{overflow:auto;max-height:76vh;padding-right:6px}
+    .sheet h2{margin:0 0 8px}
+    .section-title{margin:12px 0 6px;color:var(--muted);font-size:13px}
+    ul.ingredients{padding-left:18px;margin:6px 0}
+    ol.steps{margin:6px 0;padding-left:18px}
+    .close-btn{background:transparent;border:1px solid rgba(255,255,255,0.06);color:#fff;padding:8px 12px;border-radius:8px;cursor:pointer}
+
+    footer{padding:18px;text-align:center;color:var(--muted);font-size:13px}
+
+    @media(max-width:760px){.sheet{grid-template-columns:1fr;}.thumb{height:160px}}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>요리 레시피 모음</h1>
+    <div class="controls">
+      <input id="search" class="search" placeholder="레시피 이름으로 검색하세요...">
+      <button id="viewAll" class="close-btn">모두 보기</button>
+    </div>
+  </header>
+  <main>
+    <div class="intro">
+      <h2 style="margin:0">한식과 일식 레시피</h2>
+      <p>사진과 함께 이름, 재료, 조리 과정을 제공합니다. 클릭하면 레시피 상세를 확인할 수 있습니다.</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-category="all">모두 보기</button>
+      <button class="tab-btn" data-category="korean">한식</button>
+      <button class="tab-btn" data-category="japanese">일식</button>
+    </div>
+
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="sheet" role="dialog" aria-modal="true">
+      <div class="left">
+        <img id="mImg" src="" alt="">
+      </div>
+      <div class="content">
+        <h2 id="mTitle"></h2>
+        <div class="section-title">기본 정보</div>
+        <div id="mMeta" class="meta"></div>
+        <div class="section-title">재료</div>
+        <ul id="mIngredients" class="ingredients"></ul>
+        <div class="section-title">조리 순서</div>
+        <ol id="mSteps" class="steps"></ol>
+        <div style="margin-top:14px;text-align:right">
+          <button id="closeModal" class="close-btn">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>© 간단 레시피 • 예시 데이터</footer>
+
+  <script>
+    const recipes = [
+      {
+        id:1,
+        name:'김치찌개',
+        image:'사진/1.jpg',
+        time:'30분',
+        servings:'2~3인분',
+        ingredients:[
+          '묵은지 2컵', '돼지고기 200g', '두부 1/2모', '대파 1대', '마늘 1큰술', '고춧가루 1큰술', '물 3컵', '액젓 또는 소금 약간'
+        ],
+        steps:[
+          '냄비에 돼지고기를 넣고 살짝 볶아 기름을 낸다.',
+          '묵은지를 넣고 함께 볶다가 물을 붓고 끓인다.',
+          '두부와 대파, 마늘, 고춧가루를 넣고 10분 정도 끓인다.',
+          '간을 보고 액젓이나 소금으로 맞춘 뒤 완성한다.'
+        ]
+      },
+      {
+        id:2,
+        name:'비빔밥',
+        image:'사진/2.jpg',
+        time:'25분',
+        servings:'2인분',
+        ingredients:[
+          '밥 2공기', '시금치 50g', '나물(도라지, 고사리 등)', '당근 1/2개', '계란 2개', '고추장 2큰술', '참기름, 깨'
+        ],
+        steps:[
+          '각 재료는 데치거나 볶아 양념해 준비한다.',
+          '그릇에 밥을 담고 재료들을 고루 올린다.',
+          '계란 후라이를 올리고 고추장과 참기름을 넣어 비벼 먹는다.'
+        ]
+      },
+      {
+        id:3,
+        name:'불고기',
+        image:'사진/4.jpg',
+        time:'40분',
+        servings:'3~4인분',
+        ingredients:[
+          '소고기(얇게 썬 것) 500g', '간장 5큰술', '설탕 1큰술', '참기름 1큰술', '다진마늘 1큰술', '양파 1개', '배즙 2큰술'
+        ],
+        steps:[
+          '양념 재료를 섞어 소고기를 재운다 (30분 이상).',
+          '팬에 기름을 약간 두르고 재운 고기를 센 불에서 빠르게 볶는다.',
+          '양파를 넣어 함께 볶아 완성한다.'
+        ]
+      },
+      {
+        id:4,
+        name:'잡채',
+        image:'사진/5.jpg',
+        time:'35분',
+        servings:'3~4인분',
+        ingredients:[
+          '당면 200g', '시금치 한 줌', '당근 1/2개', '버섯 100g', '간장 3큰술', '설탕 1큰술', '참기름'
+        ],
+        steps:[
+          '당면을 삶아 찬물에 헹구고 물기를 뺀다.',
+          '채소와 버섯을 볶아 간장과 설탕으로 간한다.',
+          '당면과 채소를 섞고 참기름과 깨로 마무리한다.'
+        ]
+      },
+      {
+        id:5,
+        name:'된장찌개',
+        image:'사진/3.jpg',
+        time:'25분',
+        servings:'2~3인분',
+        ingredients:[
+          '된장 2큰술', '두부 1/2모', '애호박 1/2개', '감자 1개', '대파', '육수 또는 물 3컵'
+        ],
+        steps:[
+          '냄비에 물을 올리고 된장을 풀어 육수를 만든다.',
+          '감자와 애호박을 넣고 끓이다가 두부와 대파를 넣어 완성한다.'
+        ]
+      },
+      {
+        id:6,
+        name:'떡볶이',
+        image:'사진/6.jpg',
+        time:'20분',
+        servings:'2인분',
+        ingredients:[
+          '떡볶이떡 300g', '고추장 2큰술', '고춧가루 1큰술', '설탕 1큰술', '어묵 100g', '물 1컵'
+        ],
+        steps:[
+          '팬에 물과 양념(고추장, 고춧가루, 설탕)을 넣고 끓인다.',
+          '떡과 어묵을 넣어 양념이 배도록 졸인다.'
+        ]
+      },
+      {
+        id:7,
+        name:'삼계탕',
+        image:'사진/7.jpg',
+        time:'90분',
+        servings:'2인분',
+        ingredients:[
+          '영계 1마리', '찹쌀 1/2컵', '대추 4개', '마늘 6쪽', '인삼(선택) 소량', '물 6컵'
+        ],
+        steps:[
+          '닭 속에 찹쌀, 대추, 마늘을 넣어 속을 채운다.',
+          '냄비에 닭과 물을 넣고 1시간 이상 푹 끓인다.',
+          '간을 맞추어 내면 완성.'
+        ]
+      },
+      {
+        id:8,
+        name:'갈비찜',
+        image:'사진/8.jpg',
+        time:'120분',
+        servings:'3~4인분',
+        ingredients:[
+          '소갈비 1kg', '간장 6큰술', '설탕 2큰술', '배즙 3큰술', '마늘, 대파', '당근, 감자'
+        ],
+        steps:[
+          '갈비를 삶아 불순물을 제거하고 헹군다.',
+          '양념에 재운 뒤 채소와 함께 뭉근히 졸인다.'
+        ]
+      },
+      {
+        id:9,
+        name:'봄나물',
+        image:'사진/9.jpg',
+        time:'20분',
+        servings:'2~3인분',
+        ingredients:[
+          '취나물 100g', '두릅 100g', '냉이 100g', '달래 50g', '간장 2큰술', '참기름 1큰술', '마늘, 소금'
+        ],
+        steps:[
+          '봄나물을 깨끗이 손질하고 끓는 물에 데친다.',
+          '간장, 참기름, 마늘로 양념을 만든다.',
+          '데친 봄나물을 양념에 버무려 완성한다.'
+        ]
+      },
+      {
+        id:10,
+        name:'계란말이',
+        image:'사진/10.jpg',
+        time:'15분',
+        servings:'2인분',
+        ingredients:[
+          '계란 4개', '당근 1/2개', '파 1대', '소금, 설탕', '식용유'
+        ],
+        steps:[
+          '계란을 풀고 당근과 파를 잘게 다져 섞는다.',
+          '팬에 기름을 두르고 얇게 계란액을 펴서 반쯤 익히면 말아 가열한다.',
+          '여러 번 반복하여 두께 있게 말아 완성한다.'
+        ]
+      },
+      {
+        id:11,
+        name:'배추김치',
+        image:'사진/11.jpg',
+        time:'30분',
+        servings:'여러 끼',
+        ingredients:[
+          '배추 1포기', '고춧가루 3큰술', '마늘 1큰술', '생강 1작은술', '멸치액젓 2큰술', '소금'
+        ],
+        steps:[
+          '배추를 절여 물기를 뺀다.',
+          '고춧가루, 마늘, 생강, 액젓을 섞어 양념을 만든다.',
+          '배추에 양념을 발라 항아리에 담아 발효시킨다.'
+        ]
+      },
+      {
+        id:12,
+        name:'순두부찌개',
+        image:'사진/12.jpg',
+        time:'20분',
+        servings:'2~3인분',
+        ingredients:[
+          '순두부 300g', '멸치육수 3컵', '고추장 1큰술', '계란 2개', '대파', '마늘, 고춧가루'
+        ],
+        steps:[
+          '육수를 끓이고 고추장을 풀어 맛을 낸다.',
+          '순두부를 살살 넣고 끓인다.',
+          '계란을 떨어뜨리고 대파와 마늘을 뿌려 완성한다.'
+        ]
+      },
+      {
+        id:13,
+        name:'육개장',
+        image:'사진/13.jpg',
+        time:'50분',
+        servings:'3~4인분',
+        ingredients:[
+          '소고기 200g', '고추장 2큰술', '고춧가루 1큰술', '계란 2개', '숙주, 고사리', '대파, 마늘'
+        ],
+        steps:[
+          '소고기를 삶아 결대로 찢고 고추장 양념을 버무린다.',
+          '팬에 고춧가루를 볶아 향을 낸다.',
+          '물을 붓고 고기, 채소를 넣어 끓인다.'
+        ]
+      },
+      {
+        id:14,
+        name:'오이소박이',
+        image:'사진/14.jpg',
+        time:'25분',
+        servings:'2인분',
+        ingredients:[
+          '오이 2개', '고춧가루 2큰술', '마늘 다진 것 1큰술', '멸치액젓 1큰술', '파, 생강'
+        ],
+        steps:[
+          '오이를 약간 자르고 소금에 절여 물기를 뺀다.',
+          '고춧가루, 마늘, 액젓 양념을 만든다.',
+          '오이 사이에 양념을 넣고 냉장고에서 차갑게 식혀 먹는다.'
+        ]
+      },
+      {
+        id:15,
+        name:'제육볶음',
+        image:'사진/15.jpg',
+        time:'35분',
+        servings:'3~4인분',
+        ingredients:[
+          '소고기 불고기용 500g', '간장 5큰술', '설탕 2큰술', '고추장 1큰술', '마늘, 생강', '깨, 참기름'
+        ],
+        steps:[
+          '고기를 한 입 크기로 자르고 양념에 재운다.',
+          '팬에 고기를 펼쳐 볶는다.',
+          '양념이 고르게 배고 수분이 날아갈 때까지 볶는다.'
+        ]
+      },
+      {
+        id:16,
+        name:'미역국',
+        image:'사진/16.jpg',
+        time:'20분',
+        servings:'2인분',
+        ingredients:[
+          '건미역 30g', '쇠고기 100g', '참기름 1큰술', '마늘, 소금', '물 또는 육수 4컵'
+        ],
+        steps:[
+          '미역을 미지근한 물에 불린다.',
+          '쇠고기를 참기름에 볶다가 물을 붓고 끓인다.',
+          '미역을 넣고 10분 정도 끓인 뒤 소금으로 간을 맞춘다.'
+        ]
+      },
+      {
+        id:17,
+        name:'잔치국수',
+        image:'사진/17.jpg',
+        time:'25분',
+        servings:'2인분',
+        ingredients:[
+          '국수 200g', '멸치육수 5컵', '계란 2개', '오이, 당근', '소금, 참기름'
+        ],
+        steps:[
+          '멸치육수를 만들고 간을 맞춘다.',
+          '국수를 삶은 뒤 찬물에 헹궈 기름을 조금 친다.',
+          '그릇에 국수를 담고 육수를 붓고 계란, 채소를 얹어 완성한다.'
+        ]
+      },
+      {
+        id:18,
+        name:'소시지야채볶음',
+        image:'사진/18.jpg',
+        time:'15분',
+        servings:'2인분',
+        ingredients:[
+          '소시지 6개', '양파 1/2개', '당근 1/2개', '브로콜리 100g', '간장 1큰술', '설탕 1작은술', '식용유'
+        ],
+        steps:[
+          '소시지와 야채를 한 입 크기로 자른다.',
+          '팬에 기름을 두르고 소시지를 먼저 구워낸다.',
+          '남은 기름에 야채를 넣어 볶고 간장, 설탕으로 맛을 낸 뒤 소시지를 섞어 완성한다.'
+        ]
+      },
+      {
+        id:19,
+        name:'호박전',
+        image:'사진/19.jpg',
+        time:'20분',
+        servings:'2인분',
+        ingredients:[
+          '호박 1개', '계란 2개', '밀가루 2큰술', '소금, 고추장', '식용유'
+        ],
+        steps:[
+          '호박을 얇게 썬다.',
+          '계란 물에 호박을 적셔 밀가루를 입힌다.',
+          '팬에서 노릇하게 구워 완성한다.'
+        ]
+      },
+      {
+        id:20,
+        name:'파전',
+        image:'사진/20.jpg',
+        time:'20분',
+        servings:'2인분',
+        ingredients:[
+          '파 200g', '계란 2개', '밀가루 1컵', '물 3/4컵', '소금, 고추장', '식용유'
+        ],
+        steps:[
+          '파를 3cm 길이로 자른다.',
+          '계란, 밀가루, 물을 섞어 반죽을 만들고 파를 섞는다.',
+          '팬에 기름을 두르고 반죽을 펴서 노릇하게 구워 완성한다.'
+        ]
+      },
+      {
+        id:21,
+        name:'초밥(스시)',
+        image:'사진/21.jpg',
+        time:'40분',
+        servings:'2인분',
+        ingredients:[
+          '초밥용 밥 2공기', '초밥 식초 3큰술', '연어/참치/광어 슬라이스', '와사비, 간장'
+        ],
+        steps:[
+          '밥에 초밥 식초를 섞어 식힌다.',
+          '손에 식초물을 묻혀 밥을 적당량 쥐고 생선 슬라이스를 올린다.',
+          '와사비와 간장을 곁들여 낸다.'
+        ]
+      },
+      {
+        id:22,
+        name:'가츠동',
+        image:'사진/22.jpg',
+        time:'35분',
+        servings:'2인분',
+        ingredients:[
+          '돈까스용 돼지고기 2장', '계란 2개', '양파 1/2개', '밥 2공기', '간장, 미림'
+        ],
+        steps:[
+          '돼지고기에 밀가루-계란-튀김옷을 입혀 튀긴다.',
+          '팬에 양파와 소스를 끓이고 튀긴 돈까스를 올린 뒤 계란을 부어 반숙으로 익힌다.',
+          '밥 위에 얹어 제공한다.'
+        ]
+      },
+      {
+        id:23,
+        name:'라멘',
+        image:'사진/23.jpg',
+        time:'50분',
+        servings:'2인분',
+        ingredients:[
+          '라멘면 2인분', '육수(돈골/닭) 4컵', '차슈, 계란, 파, 김치(선택)'
+        ],
+        steps:[
+          '육수를 충분히 우려내어 맛을 낸다.',
+          '면을 삶아 그릇에 담고 육수와 토핑을 올려 완성한다.'
+        ]
+      },
+      {
+        id:24,
+        name:'텐동',
+        image:'사진/24.jpg',
+        time:'30분',
+        servings:'2인분',
+        ingredients:[
+          '새우/야채 튀김', '덮밥용 소스', '밥 2공기', '튀김가루'
+        ],
+        steps:[
+          '튀김 재료에 튀김옷을 입혀 바삭하게 튀긴다.',
+          '밥 위에 튀김을 얹고 덮밥용 소스를 끼얹어 낸다.'
+        ]
+      },
+      {
+        id:25,
+        name:'오니기리',
+        image:'사진/25.jpg',
+        time:'15분',
+        servings:'2인분',
+        ingredients:[
+          '밥 2공기', '소금, 김', '속재료(우메보시,참치마요 등)'
+        ],
+        steps:[
+          '밥에 소금을 약간 넣고 적당량을 손에 쥔다.',
+          '가운데에 속재료를 넣고 모양을 잡아 김으로 감싼다.'
+        ]
+      },
+      {
+        id:26,
+        name:'야키토리',
+        image:'사진/26.jpg',
+        time:'25분',
+        servings:'2인분',
+        ingredients:[
+          '닭고기 300g', '대파 1대', '타레 소스(간장, 미림, 설탕)', '꼬치'
+        ],
+        steps:[
+          '닭고기와 파를 적당한 크기로 썰어 꼬치에 끼운다.',
+          '그릴이나 팬에서 굽고 타레 소스를 발라가며 익힌다.'
+        ]
+      },
+      {
+        id:27,
+        name:'가라아게',
+        image:'사진/27.jpg',
+        time:'30분',
+        servings:'2~3인분',
+        ingredients:[
+          '닭다리살 400g', '간장, 마늘, 생강', '전분(감자/고구마)'
+        ],
+        steps:[
+          '닭을 간장, 마늘, 생강에 재운다.',
+          '전분을 입혀 기름에 바삭하게 튀긴다.'
+        ]
+      },
+      {
+        id:28,
+        name:'우동',
+        image:'사진/28.jpg',
+        time:'20분',
+        servings:'2인분',
+        ingredients:[
+          '우동면 2인분', '가쓰오부시 육수 4컵', '파, 어묵'
+        ],
+        steps:[
+          '육수를 끓이고 면을 삶는다.',
+          '그릇에 면을 담고 육수와 토핑을 올려 완성한다.'
+        ]
+      },
+      {
+        id:29,
+        name:'고로케',
+        image:'사진/30.jpg',
+        time:'25분',
+        servings:'2~3인분',
+        ingredients:[
+          '감자 200g', '소시지 50g', '양파 1/4개', '밀가루, 계란, 빵가루', '식용유'
+        ],
+        steps:[
+          '감자와 소시지, 양파를 익혀서 으깬 후 섞는다.',
+          '냉동실에서 식혀 동그란 모양으로 빚는다.',
+          '밀가루-계란-빵가루를 입혀 튀긴다.'
+        ]
+      },
+      {
+        id:30,
+        name:'낫토',
+        image:'사진/31.jpg',
+        time:'5분',
+        servings:'1인분',
+        ingredients:[
+          '낫토(발효 대두)', '낫토 타레', '겨자', '밥 1공기'
+        ],
+        steps:[
+          '낫토를 그릇에 담고 낫토 타레와 겨자를 섞는다.',
+          '잘 저어서 밥 위에 얹어낸다.'
+        ]
+      },
+      {
+        id:31,
+        name:'당고',
+        image:'사진/32.jpg',
+        time:'20분',
+        servings:'2인분',
+        ingredients:[
+          '찹쌀가루 150g', '물 100ml', '설탕 2큰술', '간장 양념, 깨'
+        ],
+        steps:[
+          '찹쌀가루에 물을 섞어 반죽을 만든다.',
+          '작은 구슬 모양으로 빚어 끓는 물에 삶는다.',
+          '떠오르면 꺼내어 간장 양념에 버무린다.'
+        ]
+      },
+      {
+        id:32,
+        name:'덴푸라',
+        image:'사진/33.jpg',
+        time:'25분',
+        servings:'2~3인분',
+        ingredients:[
+          '새우, 야채(가지, 호박 등)', '튀김가루 1컵', '물 3/4컵', '소금, 식용유'
+        ],
+        steps:[
+          '튀김가루와 물을 섞어 반죽을 만든다.',
+          '새우와 야채에 반죽을 입혀 기름에 튀긴다.',
+          '천연 소금이나 튀김 소스와 함께 낸다.'
+        ]
+      },
+      {
+        id:33,
+        name:'돈카츠',
+        image:'사진/34.jpg',
+        time:'30분',
+        servings:'2인분',
+        ingredients:[
+          '돼지고기(등심) 2장', '밀가루, 계란, 빵가루', '소스, 양배추', '식용유'
+        ],
+        steps:[
+          '돼지고기를 두드려 납작하게 펀다.',
+          '밀가루-계란-빵가루를 차례로 입혀 기름에 튀긴다.',
+          '소스를 얹고 양배추와 함께 낸다.'
+        ]
+      },
+      {
+        id:34,
+        name:'돈부리',
+        image:'사진/35.jpg',
+        time:'20분',
+        servings:'1인분',
+        ingredients:[
+          '밥 1공기', '돼지고기 슬라이스 100g', '양파 1/4개', '간장 양념, 계란(선택)'
+        ],
+        steps:[
+          '돼지고기와 양파를 양념에 볶는다.',
+          '밥 위에 올리고 원하면 계란을 부어낸다.'
+        ]
+      },
+      {
+        id:35,
+        name:'스키야키',
+        image:'사진/36.jpg',
+        time:'35분',
+        servings:'3~4인분',
+        ingredients:[
+          '소고기 슬라이스 300g', '두부, 버섯, 야채(배추, 파)', '간장 양념, 설탕, 미림'
+        ],
+        steps:[
+          '냄비에 소고기와 야채를 넣는다.',
+          '간장 양념과 설탕, 미림을 섞은 소스를 부어 끓인다.',
+          '생 계란에 찍어 먹는다.'
+        ]
+      },
+      {
+        id:36,
+        name:'오코노미야키',
+        image:'사진/37.jpg',
+        time:'25분',
+        servings:'2인분',
+        ingredients:[
+          '밀가루 1컵', '물 3/4컵', '계란 1개', '양배추 2컵', '돼지고기(선택) 100g', '오코노미야키 소스, 마요네즈'
+        ],
+        steps:[
+          '밀가루, 물, 계란을 섞어 반죽을 만든다.',
+          '양배추와 고기를 섞어 핫플레이트에서 구운다.',
+          '소스와 마요네즈를 얹어낸다.'
+        ]
+      },
+      {
+        id:37,
+        name:'우메보시',
+        image:'사진/38.jpg',
+        time:'10분',
+        servings:'1인분',
+        ingredients:[
+          '우메보시(매실 절임)', '밥 1공기', '김(선택)'
+        ],
+        steps:[
+          '밥에 우메보시를 얹는다.',
+          '원하면 김으로 감싸낸다.'
+        ]
+      },
+      {
+        id:38,
+        name:'창코나베',
+        image:'사진/39.jpg',
+        time:'40분',
+        servings:'3~4인분',
+        ingredients:[
+          '닭다리살 또는 소고기 300g', '두부, 버섯, 야채', '육수 5컵', '간장, 소금'
+        ],
+        steps:[
+          '육수를 끓이고 간장으로 맛을 낸다.',
+          '재료들을 넣고 끓인다.',
+          '생 계란에 찍어 먹는다.'
+        ]
+      },
+      {
+        id:39,
+        name:'타코야키',
+        image:'사진/40.jpg',
+        time:'20분',
+        servings:'2~3인분',
+        ingredients:[
+          '타코야키 가루 1컵', '물 3/4컵', '문어(또는 새우) 100g', '파, 천지어', '타코야키 소스, 마요네즈'
+        ],
+        steps:[
+          '가루와 물을 섞어 반죽을 만든다.',
+          '타코야키 팬에 반죽을 붓고 재료를 넣어 구운다.',
+          '소스와 마요네즈를 얹어낸다.'
+        ]
+      },
+      {
+        id:40,
+        name:'오뎅',
+        image:'사진/41.jpg',
+        time:'30분',
+        servings:'2~3인분',
+        ingredients:[
+          '어묵, 계란, 무, 두부', '육수 4컵', '간장, 소금, 미림'
+        ],
+        steps:[
+          '육수를 끓이고 간장, 소금, 미림으로 맛을 낸다.',
+          '재료들을 넣고 15분 정도 끓인다.',
+          '뜨거운 상태로 낸다.'
+        ]
+      }
+      ,
+      {
+        id:41,
+        name:'북경 오리',
+        image:'사진/42.jpg',
+        time:'90분',
+        servings:'3~4인분',
+        ingredients:[
+          '오리 1마리', '간장 소스', '오이, 파, 팬케이크 또는 밀전병'
+        ],
+        steps:[
+          '오리를 손질하여 양념에 재운다.',
+          '오리를 오븐 또는 로스터에 구워 겉은 바삭하게 만든다.',
+          '팬케이크에 오리고기와 채소, 소스를 넣어 싸서 먹는다.'
+        ]
+      }
+      ,
+      {
+        id:42,
+        name:'훠궈',
+        image:'사진/43.jpg',
+        time:'60분',
+        servings:'3~4인분',
+        ingredients:[
+          '각종 야채(배추, 청경채 등)', '얇게 썬 고기류', '훠궈 양념 및 육수', '샤브용 재료'
+        ],
+        steps:[
+          '육수를 끓여 훠궈용 베이스를 준비한다.',
+          '재료를 적당히 데쳐가며 소스와 함께 먹는다.',
+          '마지막에 면이나 밥을 넣어 마무리한다.'
+        ]
+      },
+      {
+        id:43,
+        name:'마파두부',
+        image:'사진/44.jpg',
+        time:'25분',
+        servings:'2~3인분',
+        ingredients:[
+          '두부 1모', '다진 돼지고기 150g', '대파, 마늘', '두반장 1큰술', '간장, 설탕, 물'
+        ],
+        steps:[
+          '팬에 기름을 두르고 다진 마늘과 다진 돼지고기를 볶는다.',
+          '두반장을 넣어 향을 내고 소스로 간을 맞춘다.',
+          '두부를 넣고 살짝 조려 대파를 넣어 마무리한다.'
+        ]
+      }
+      ,
+      {
+        id:44,
+        name:'바오즈',
+        image:'사진/45.jpg',
+        time:'30분',
+        servings:'2~3인분',
+        ingredients:[
+          '밀가루 만두피 또는 소형 만두피', '다진 돼지고기 150g', '양배추/부추 약간', '간장, 참기름, 설탕, 다진 마늘'
+        ],
+        steps:[
+          '속재료를 잘 섞어 만두소를 만든다.',
+          '만두피에 소를 넣고 단단히 빚어 찐다.',
+          '따뜻할 때 소스와 함께 제공한다.'
+        ]
+      }
+      ,
+      {
+        id:45,
+        name:'완탕',
+        image:'사진/46.jpg',
+        time:'20분',
+        servings:'2~3인분',
+        ingredients:[
+          '완탕피 또는 얇은 만두피', '다진 돼지고기 150g', '잘게 썬 파', '다진 마늘', '간장, 참기름, 후추'
+        ],
+        steps:[
+          '속재료를 섞어 만두소를 만든다.',
+          '만두피에 소를 넣어 완탕 모양으로 빚는다.',
+          '끓는 물에 완탕을 익히거나 국물과 함께 제공한다.'
+        ]
+      }
+      ,
+      {
+        id:46,
+        name:'취두부',
+        image:'사진/47.jpg',
+        time:'15분',
+        servings:'1~2인분',
+        ingredients:[
+          '취두부 (발효 두부) 1조각', '파, 고추기름', '간장 또는 소스', '향신채(선택)'
+        ],
+        steps:[
+          '취두부를 적당한 크기로 썬다.',
+          '접시에 담고 파와 고추기름, 간장 등을 곁들여 제공한다.',
+          '원하면 향신채를 올려 풍미를 더한다.'
+        ]
+      }
+      ,
+      {
+        id:47,
+        name:'가지찜',
+        image:'사진/48.jpg',
+        time:'40분',
+        servings:'2~3인분',
+        ingredients:[
+          '가지 2개', '다진 마늘 1큰술', '간장 2큰술', '설탕 1작은술', '참기름 1작은술', '파 약간'
+        ],
+        steps:[
+          '가지를 먹기 좋은 크기로 썰어 소금을 약간 뿌려 물기를 뺀다.',
+          '팬에 기름을 두르고 가지를 부드럽게 익힌다.',
+          '다진 마늘과 간장, 설탕을 섞은 양념을 넣고 조려 참기름과 파를 넣어 마무리한다.'
+        ]
+      }
+      ,
+      {
+        id:48,
+        name:'젠빙',
+        image:'사진/49.jpg',
+        time:'20분',
+        servings:'1~2인분',
+        ingredients:[
+          '밀가루 반죽 또는 팬케이크 반죽', '속재료(달콤하거나 짭짤한 소)', '설탕 또는 소스(선택)'
+        ],
+        steps:[
+          '반죽을 얇게 펴고 속재료를 넣어 접는다.',
+          '팬에 약한 불로 앞뒤를 노릇하게 굽는다.',
+          '따뜻할 때 소스나 설탕과 함께 제공한다.'
+        ]
+      }
+      ,
+      {
+        id:49,
+        name:'탕후루',
+        image:'사진/50.jpg',
+        time:'30분',
+        servings:'2~3인분',
+        ingredients:[
+          '과일(딸기, 귤, 포도 등)', '설탕 1컵', '물 1/4컵', '꼬치'
+        ],
+        steps:[
+          '과일을 깨끗이 씻어 꼬치에 꽂는다.',
+          '냄비에 설탕과 물을 넣어 시럽을 만들고 시럽이 끓어 유리처럼 될 때까지 끓인다.',
+          '과일 꼬치를 시럽에 담갔다 꺼내어 식혀 단단하게 굳힌다.'
+        ]
+      },
+      {
+        id:50,
+        name:'유린기',
+        image:'사진/51.jpg',
+        time:'25분',
+        servings:'2~3인분',
+        ingredients:[
+          '닭 가슴살 또는 닭다리살 300g', '전분 약간', '식용유', '양파/파/당근(선택)', '간장, 식초, 설탕, 다진 마늘'
+        ],
+        steps:[
+          '닭고기를 한입 크기로 썰어 전분을 살짝 묻힌다.',
+          '기름에 바삭하게 튀겨 기름을 뺀다.',
+          '간장-식초-설탕-다진 마늘 소스를 만들어 튀긴 닭에 부어 야채와 함께 제공한다.'
+        ]
+      }
+     ];
+
+    // render
+    const grid = document.getElementById('grid');
+    const search = document.getElementById('search');
+    const viewAll = document.getElementById('viewAll');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    let currentCategory = 'all';
+
+    function getCategory(id){
+      return id <= 20 ? 'korean' : 'japanese';
+    }
+
+    function renderList(list){
+      grid.innerHTML = '';
+      list.forEach(r=>{
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <img class="thumb" src="${r.image}" alt="${r.name}">
+          <div class="card-body">
+            <h3 class="title">${r.name}</h3>
+            <div class="meta">${r.time} • ${r.servings}</div>
+            <div class="badge">레시피 보기</div>
+          </div>`;
+        card.addEventListener('click',()=>openModal(r.id));
+        grid.appendChild(card);
+      });
+    }
+
+    function filterByCategory(list, category){
+      if(category === 'all') return list;
+      return list.filter(r=>getCategory(r.id) === category);
+    }
+
+    // modal
+    const modal = document.getElementById('modal');
+    const mImg = document.getElementById('mImg');
+    const mTitle = document.getElementById('mTitle');
+    const mMeta = document.getElementById('mMeta');
+    const mIngredients = document.getElementById('mIngredients');
+    const mSteps = document.getElementById('mSteps');
+    const closeModalBtn = document.getElementById('closeModal');
+
+    function openModal(id){
+      const r = recipes.find(x=>x.id===id);
+      if(!r) return;
+      mImg.src = r.image;
+      mImg.alt = r.name;
+      mTitle.textContent = r.name;
+      mMeta.textContent = `${r.time} • ${r.servings}`;
+      mIngredients.innerHTML = r.ingredients.map(i=>`<li>${i}</li>`).join('');
+      mSteps.innerHTML = r.steps.map(s=>`<li>${s}</li>`).join('');
+      modal.classList.add('open');
+      modal.setAttribute('aria-hidden','false');
+    }
+    function closeModal(){
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden','true');
+    }
+    closeModalBtn.addEventListener('click',closeModal);
+    modal.addEventListener('click',(e)=>{ if(e.target===modal) closeModal(); });
+
+    // search & category
+    function filterByQuery(q){
+      q = q.trim().toLowerCase();
+      if(!q) return recipes;
+      return recipes.filter(r=>r.name.toLowerCase().includes(q));
+    }
+
+    function applyFilters(){
+      let filtered = filterByQuery(search.value);
+      filtered = filterByCategory(filtered, currentCategory);
+      renderList(filtered);
+    }
+
+    // tab buttons
+    tabBtns.forEach(btn=>{
+      btn.addEventListener('click',()=>{
+        tabBtns.forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        currentCategory = btn.getAttribute('data-category');
+        applyFilters();
+      });
+    });
+
+    search.addEventListener('input',()=>applyFilters());
+    viewAll.addEventListener('click',()=>{ search.value=''; currentCategory='all'; tabBtns[0].classList.add('active'); tabBtns.forEach((b,i)=>{ if(i>0) b.classList.remove('active'); }); applyFilters(); });
+
+    // initial
+    renderList(recipes);
+  </script>
+</body>
+</html>
